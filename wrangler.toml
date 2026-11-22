@@ -12,6 +12,7 @@ run_worker_first = true
 [[d1_databases]]
 binding = "DB"
 database_name = "anonbot"
+database_id = "c86aba41-dc39-4238-a6b8-aed5486fc6eb"
 
 # Раз в сутки чистим старые сообщения
 [triggers]
