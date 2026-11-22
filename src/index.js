@@ -65,7 +65,9 @@ async function getBotName(env) {
 // Стабильное придуманное имя для человека: одно и то же при каждом сообщении,
 // но по нему нельзя вычислить настоящий id (нужен секрет SECRET).
 async function alias(env, uid) {
-  const h = await hmac(env.SECRET, "alias:" + uid);
+  // SECRET — основной ключ. Фолбэк нужен только если переменная не задана,
+  // чтобы приём сообщений не падал с ошибкой.
+  const h = await hmac(env.SECRET || "anonbot-default-secret", "alias:" + uid);
   return {
     name: `${ADJ[h[0] % ADJ.length]} ${ANI[h[1] % ANI.length]}`,
     hue: (h[2] * 256 + h[3]) % 360,
@@ -87,6 +89,7 @@ function kindOf(m) {
 
 // Проверка подписи initData из Mini App: пускаем только владельца бота.
 async function isOwner(req, env) {
+  if (!env.BOT_TOKEN || !env.OWNER_ID) return false;
   const raw = (req.headers.get("Authorization") || "").replace(/^tma /, "");
   if (!raw) return false;
   const p = new URLSearchParams(raw);
@@ -289,7 +292,10 @@ export default {
     // Telegram шлёт вебхук на /webhook или на корень /. GET / остаётся для
     // Mini App / healthcheck и уходит в статику ниже.
     if ((p === "/webhook" || p === "/") && req.method === "POST") {
-      if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.SECRET) {
+      // secret_token опционален: проверяем его, только если SECRET задан и
+      // Telegram прислал заголовок. Вебхук без secret_token тоже принимается.
+      const secret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
+      if (env.SECRET && secret && secret !== env.SECRET) {
         return new Response("forbidden", { status: 403 });
       }
       const update = await req.json();
@@ -299,10 +305,11 @@ export default {
 
     // Открой в браузере один раз: https://<воркер>.workers.dev/setup?key=<SECRET>
     if (p === "/setup") {
-      if (url.searchParams.get("key") !== env.SECRET) return new Response("forbidden", { status: 403 });
+      if (!env.SECRET || url.searchParams.get("key") !== env.SECRET)
+        return new Response("forbidden", { status: 403 });
       const webhook = await tg(env, "setWebhook", {
         url: url.origin + "/webhook",
-        secret_token: env.SECRET,
+        ...(env.SECRET ? { secret_token: env.SECRET } : {}),
         allowed_updates: ["message"],
         drop_pending_updates: true,
       });
