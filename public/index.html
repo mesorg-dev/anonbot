@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark light">
+<title>Анонимки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+  --bg: #14111f;
+  --surface: #1e1a2e;
+  --raised: #2a2440;
+  --line: #37304f;
+  --text: #eeeafb;
+  --muted: #9a93b5;
+  --accent: #8b7bff;
+  --on-accent: #120c33;
+  --danger: #ff7a8a;
+  --scrim: rgba(8, 6, 16, .6);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #f3f1f9;
+  --surface: #ffffff;
+  --raised: #ebe8f5;
+  --line: #dcd7ec;
+  --text: #1d1830;
+  --muted: #6f6889;
+  --accent: #5b4be0;
+  --on-accent: #ffffff;
+  --danger: #d6334f;
+  --scrim: rgba(29, 24, 48, .35);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 400 16px/1.45 "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { max-width: 560px; margin: 0 auto; padding: 22px 16px 40px; }
+
+.top { padding: 6px 4px 18px; }
+h1 {
+  margin: 0;
+  font: 700 32px/1.05 "Unbounded", "Onest", sans-serif;
+  letter-spacing: -.02em;
+}
+#sub { margin: 8px 0 0; color: var(--muted); font-size: 15px; }
+
+.tabs {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  padding: 4px; border-radius: 16px; background: var(--surface);
+  position: sticky; top: 8px; z-index: 2;
+  box-shadow: 0 0 0 6px var(--bg);
+}
+.tabs button {
+  background: transparent; color: var(--muted);
+  height: 40px; border-radius: 12px; font-weight: 500; font-size: 14.5px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background .15s, color .15s;
+}
+.tabs button b { font-weight: 600; font-size: 12.5px; padding: 1px 7px; border-radius: 99px; background: var(--raised); }
+.tabs button[aria-selected="true"] { background: var(--raised); color: var(--text); }
+.tabs button[aria-selected="true"] b { background: var(--accent); color: var(--on-accent); }
+
+#list { display: grid; gap: 12px; margin-top: 18px; }
+.bar { display: flex; justify-content: flex-end; }
+
+/* маска-аватар: цвет зависит от человека, лица не видно */
+.av {
+  --c: hsl(var(--hue) 68% 60%);
+  width: 44px; height: 44px; border-radius: 50%; flex: none;
+  background: var(--c); display: grid; place-items: center;
+}
+.av svg { width: 30px; height: 30px; }
+.av .m { fill: rgba(255, 255, 255, .95); }
+.av .e { fill: var(--c); }
+
+.msg {
+  --c: hsl(var(--hue) 70% 62%);
+  display: grid; grid-template-columns: 44px 1fr; gap: 12px;
+  padding: 14px; border-radius: 22px;
+  background: color-mix(in oklab, var(--c) 9%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--c) 24%, var(--line));
+}
+.msg.enter .av { animation: pop .5s cubic-bezier(.3, 1.5, .5, 1) both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes pop { from { transform: scale(.4) rotate(-14deg); opacity: 0; } }
+
+.meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.meta strong { font-weight: 600; font-size: 15.5px; }
+.meta time { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.txt {
+  margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 7; overflow: hidden;
+}
+.txt.can { cursor: pointer; }
+.txt.can:not(.open) { -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+.txt.open { display: block; -webkit-mask-image: none; mask-image: none; }
+.chip {
+  display: inline-block; margin-top: 8px; padding: 2px 10px; border-radius: 99px;
+  font-size: 13px; color: var(--muted); background: var(--raised);
+}
+
+.acts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn {
+  height: 48px; padding: 0 20px; border-radius: 14px; font-weight: 600;
+  background: var(--raised); transition: transform .1s, opacity .15s;
+}
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.sm { height: 36px; padding: 0 14px; border-radius: 11px; font-size: 14.5px; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.danger { background: color-mix(in oklab, var(--danger) 15%, transparent); color: var(--danger); }
+.btn.ghost { background: var(--raised); color: var(--text); }
+.acts .danger { margin-left: auto; }
+
+/* отвеченные */
+.msg.done { background: var(--surface); border-color: var(--line); }
+.msg.done .txt { color: var(--muted); -webkit-line-clamp: 3; font-size: 15px; }
+.reply {
+  margin-top: 10px; padding: 10px 12px; border-radius: 16px 16px 16px 6px;
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.reply small { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+
+.ban { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); }
+.ban .who { flex: 1; min-width: 0; }
+.ban strong { display: block; font-weight: 600; }
+.ban small { color: var(--muted); font-size: 13px; }
+
+.empty { text-align: center; padding: 56px 24px; color: var(--muted); }
+.empty h2 { margin: 0 0 8px; font: 600 19px/1.2 "Unbounded", "Onest", sans-serif; color: var(--text); }
+.empty p { margin: 0 auto 18px; max-width: 30ch; }
+
+/* окно ответа */
+.sheet { position: fixed; inset: 0; z-index: 10; visibility: hidden; transition: visibility 0s linear .3s; }
+.sheet.open { visibility: visible; transition-delay: 0s; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); opacity: 0; transition: opacity .25s; }
+.open .scrim { opacity: 1; }
+.panel {
+  position: absolute; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 560px;
+  max-height: 90dvh; overflow: auto;
+  background: var(--surface); border-radius: 28px 28px 0 0;
+  padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+}
+.open .panel { transform: none; }
+.grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 14px; }
+.who { display: flex; align-items: center; gap: 12px; }
+.who strong { display: block; font-weight: 600; }
+.who small { color: var(--muted); font-size: 13px; }
+#sh-q {
+  margin: 14px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--raised);
+  color: var(--muted); font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere;
+  max-height: 22dvh; overflow: auto;
+}
+#sh-text {
+  width: 100%; margin-top: 12px; padding: 14px; border-radius: 16px; resize: none;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  font: inherit; min-height: 110px; max-height: 34dvh;
+}
+.row { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 12px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 20;
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 14px;
+  background: var(--text); color: var(--bg); font-weight: 500; font-size: 15px;
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.bad { background: var(--danger); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1>Анонимки</h1>
+    <p id="sub">Загрузка…</p>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Разделы">
+    <button role="tab" data-tab="inbox" aria-selected="true">Новые <b id="n-inbox">0</b></button>
+    <button role="tab" data-tab="answered" aria-selected="false">Отвечены <b id="n-answered">0</b></button>
+    <button role="tab" data-tab="banned" aria-selected="false">Баны <b id="n-banned">0</b></button>
+  </nav>
+  <section id="list" aria-live="polite"></section>
+</main>
+
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="scrim" data-close></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sh-name">
+    <div class="grab"></div>
+    <div class="who">
+      <span id="sh-av"></span>
+      <div><strong id="sh-name"></strong><small id="sh-time"></small></div>
+    </div>
+    <blockquote id="sh-q"></blockquote>
+    <textarea id="sh-text" maxlength="3500" placeholder="Напиши ответ. Он придёт человеку от имени бота."></textarea>
+    <div class="row">
+      <button class="btn ghost" data-close>Отмена</button>
+      <button class="btn primary" id="sh-send" disabled>Отправить</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const root = document.documentElement;
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ----- тема и Telegram -----
+  const applyTheme = () => {
+    const scheme = (tg && tg.colorScheme) || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    root.dataset.theme = scheme;
+    try {
+      const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+      tg.setHeaderColor(bg);
+      tg.setBackgroundColor(bg);
+    } catch (e) {}
+  };
+  applyTheme();
+  try { tg.onEvent("themeChanged", applyTheme); tg.ready(); tg.expand(); } catch (e) {}
+
+  const tap = () => { try { tg.HapticFeedback.impactOccurred("light"); } catch (e) {} };
+  const buzz = (t) => { try { tg.HapticFeedback.notificationOccurred(t); } catch (e) {} };
+  const ask = (msg) => new Promise((res) => {
+    if (tg && tg.showConfirm) tg.showConfirm(msg, res); else res(confirm(msg));
+  });
+
+  let toastTimer;
+  function toast(msg, bad) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.toggle("bad", !!bad);
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  async function call(path, body) {
+    const r = await fetch(path, {
+      method: body ? "POST" : "GET",
+      headers: { "Authorization": "tma " + ((tg && tg.initData) || ""), "content-type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const e = new Error(j.detail || j.error || "Ошибка " + r.status);
+      e.status = r.status;
+      throw e;
+    }
+    return j;
+  }
+
+  // ----- состояние -----
+  let S = { inbox: [], answered: [], banned: [], bot: "" };
+  let tab = "inbox", loaded = false, firstPaint = true, current = null, busy = false;
+  const drafts = new Map();
+
+  const ago = (ts) => {
+    const s = Math.max(0, (Date.now() - ts) / 1000);
+    if (s < 60) return "только что";
+    const m = s / 60;
+    if (m < 60) return Math.floor(m) + " мин назад";
+    const h = m / 60;
+    if (h < 24) return Math.floor(h) + " ч назад";
+    return Math.floor(h / 24) + " дн назад";
+  };
+
+  const mask = (hue) =>
+    `<span class="av" style="--hue:${Number(hue) || 0}"><svg viewBox="0 0 40 40" aria-hidden="true">` +
+    `<path class="m" d="M5 13.5C9.5 10 14.5 9 20 9s10.5 1 15 4.5c0 10-4.5 18-15 18S5 23.5 5 13.5z"/>` +
+    `<ellipse class="e" cx="13.5" cy="18.5" rx="3.6" ry="2.3" transform="rotate(12 13.5 18.5)"/>` +
+    `<ellipse class="e" cx="26.5" cy="18.5" rx="3.6" ry="2.3" transform="rotate(-12 26.5 18.5)"/>` +
+    `</svg></span>`;
+
+  const body = (m) => m.text
+    ? `<p class="txt">${esc(m.text)}</p>${m.kind ? `<span class="chip">${esc(m.kind)}, смотри в чате с ботом</span>` : ""}`
+    : `<span class="chip">${esc(m.kind || "Вложение")}, смотри в чате с ботом</span>`;
+
+  const card = (m, i) => `
+    <article class="msg${firstPaint ? " enter" : ""}" style="--hue:${Number(m.hue) || 0};--i:${Math.min(i, 8)}">
+      ${mask(m.hue)}
+      <div>
+        <div class="meta"><strong>${esc(m.alias)}</strong><time>${ago(m.created_at)}</time></div>
+        ${body(m)}
+        <div class="acts">
+          <button class="btn primary sm" data-act="reply" data-id="${m.id}">Ответить</button>
+          <button class="btn ghost sm" data-act="del" data-id="${m.id}">Удалить</button>
+          <button class="btn danger sm" data-act="ban" data-id="${m.id}">Забанить</button>
+        </div>
+      </div>
+    </article>`;
+
+  const doneCard = (m) => `
+    <article class="msg done" style="--hue:${Number(m.hue) || 0}">
+      ${mask(m.hue)}
+      <div>
+        <div class="meta"><strong>${esc(m.alias)}</strong><time>${ago(m.created_at)}</time></div>
+        ${m.text ? `<p class="txt">${esc(m.text)}</p>` : `<span class="chip">${esc(m.kind || "Вложение")}</span>`}
+        <div class="reply">${esc(m.reply_text)}<small>Ответ ${ago(m.answered_at)}</small></div>
+      </div>
+    </article>`;
+
+  const banRow = (b) => `
+    <div class="ban" style="--hue:${Number(b.hue) || 0}">
+      ${mask(b.hue)}
+      <div class="who"><strong>${esc(b.alias)}</strong><small>в бане с ${new Date(b.ts).toLocaleDateString("ru-RU")}</small></div>
+      <button class="btn ghost sm" data-act="unban" data-id="${b.id}">Разбанить</button>
+    </div>`;
+
+  const empty = (title, text, btn) =>
+    `<div class="empty"><h2>${title}</h2><p>${text}</p>${btn || ""}</div>`;
+
+  function render() {
+    const n = S.inbox.length;
+    $("#sub").textContent = !loaded ? "Загрузка…" : n ? "Ждут ответа: " + n : "Всё разобрано";
+    $("#n-inbox").textContent = n;
+    $("#n-answered").textContent = S.answered.length;
+    $("#n-banned").textContent = S.banned.length;
+    document.querySelectorAll(".tabs button").forEach((b) =>
+      b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+
+    let html = "";
+    if (tab === "inbox") {
+      html = n
+        ? S.inbox.map(card).join("")
+        : empty("Пока тихо",
+            "Когда кто-то напишет боту, сообщение появится здесь. Имя человека ты не увидишь.",
+            S.bot ? `<button class="btn primary" data-act="share">Поделиться ботом</button>` : "");
+    } else if (tab === "answered") {
+      html = S.answered.length
+        ? `<div class="bar"><button class="btn ghost sm" data-act="clear">Очистить отвеченные</button></div>` + S.answered.map(doneCard).join("")
+        : empty("Ответов пока нет", "Здесь будут сообщения, на которые ты ответил. Через 7 дней они удалятся сами.");
+    } else {
+      html = S.banned.length
+        ? S.banned.map(banRow).join("")
+        : empty("Список пуст", "Забаненные люди больше не смогут писать боту.");
+    }
+    $("#list").innerHTML = html;
+    document.querySelectorAll(".txt").forEach((el) => {
+      if (el.scrollHeight > el.clientHeight + 2) el.classList.add("can");
+    });
+    firstPaint = false;
+  }
+
+  async function load(silent) {
+    try {
+      S = await call("/api/state");
+      loaded = true;
+      render();
+    } catch (e) {
+      if (silent) return;
+      $("#sub").textContent = "";
+      $("#list").innerHTML = e.status === 401 || !(tg && tg.initData)
+        ? empty("Только для владельца", "Открой приложение из бота в Telegram с аккаунта владельца.")
+        : empty("Не удалось загрузить", esc(e.message), `<button class="btn primary" data-act="retry">Повторить</button>`);
+    }
+  }
+
+  // ----- окно ответа -----
+  const sheet = $("#sheet"), ta = $("#sh-text"), sendBtn = $("#sh-send");
+  const sheetOpen = () => sheet.classList.contains("open");
+
+  function openSheet(id) {
+    const m = S.inbox.find((x) => x.id === id);
+    if (!m) return;
+    current = m;
+    $("#sh-av").innerHTML = mask(m.hue);
+    $("#sh-name").textContent = m.alias;
+    $("#sh-time").textContent = ago(m.created_at);
+    $("#sh-q").textContent = m.text || m.kind || "Вложение";
+    ta.value = drafts.get(id) || "";
+    sendBtn.disabled = !ta.value.trim();
+    sheet.classList.add("open");
+    sheet.setAttribute("aria-hidden", "false");
+    try { tg.BackButton.show(); } catch (e) {}
+    setTimeout(() => ta.focus(), 280);
+  }
+
+  function closeSheet() {
+    if (current) drafts.set(current.id, ta.value);
+    sheet.classList.remove("open");
+    sheet.setAttribute("aria-hidden", "true");
+    ta.blur();
+    try { tg.BackButton.hide(); } catch (e) {}
+  }
+
+  ta.addEventListener("input", () => { sendBtn.disabled = busy || !ta.value.trim(); });
+  sheet.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeSheet(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetOpen()) closeSheet(); });
+  try { tg.BackButton.onClick(closeSheet); } catch (e) {}
+
+  sendBtn.addEventListener("click", async () => {
+    const text = ta.value.trim();
+    if (!text || !current || busy) return;
+    busy = true;
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Отправляю…";
+    try {
+      await call("/api/reply", { id: current.id, text });
+      drafts.delete(current.id);
+      buzz("success");
+      toast("Ответ отправлен");
+      closeSheet();
+      current = null;
+      await load(true);
+    } catch (e) {
+      buzz("error");
+      toast(e.message, true);
+    } finally {
+      busy = false;
+      sendBtn.textContent = "Отправить";
+      sendBtn.disabled = !ta.value.trim();
+    }
+  });
+
+  // ----- клики по списку -----
+  $("#list").addEventListener("click", async (e) => {
+    const txt = e.target.closest(".txt.can");
+    if (txt) { txt.classList.toggle("open"); return; }
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const id = Number(b.dataset.id);
+    tap();
+    try {
+      switch (b.dataset.act) {
+        case "reply": openSheet(id); break;
+        case "retry": load(); break;
+        case "del":
+          if (await ask("Удалить сообщение без ответа?")) {
+            await call("/api/delete", { id });
+            toast("Удалено");
+            await load(true);
+          }
+          break;
+        case "ban":
+          if (await ask("Забанить отправителя? Его сообщения удалятся, и писать боту он больше не сможет.")) {
+            await call("/api/ban", { id });
+            toast("Забанен");
+            await load(true);
+          }
+          break;
+        case "unban":
+          await call("/api/unban", { id });
+          toast("Разбанен");
+          await load(true);
+          break;
+        case "clear":
+          if (await ask("Удалить все отвеченные сообщения?")) {
+            await call("/api/clear", {});
+            toast("Очищено");
+            await load(true);
+          }
+          break;
+        case "share": {
+          const link = "https://t.me/" + S.bot;
+          const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent("Напиши мне анонимно");
+          if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
+          break;
+        }
+      }
+    } catch (err) {
+      buzz("error");
+      toast(err.message, true);
+    }
+  });
+
+  document.querySelector(".tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tab]");
+    if (!b || b.dataset.tab === tab) return;
+    tap();
+    tab = b.dataset.tab;
+    render();
+    scrollTo({ top: 0 });
+  });
+
+  // обновляем список, пока приложение открыто и окно ответа закрыто
+  setInterval(() => { if (!document.hidden && !sheetOpen()) load(true); }, 15000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !sheetOpen()) load(true); });
+
+  render();
+  load();
+})();
+</script>
+</body>
+</html>

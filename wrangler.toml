@@ -1,0 +1,19 @@
+name = "anonbot"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Mini App (папка public) раздаётся этим же воркером
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+# База D1. Вставь сюда id своей базы (Storage & databases → D1 → твоя база)
+[[d1_databases]]
+binding = "DB"
+database_name = "anonbot"
+database_id = "ВСТАВЬ-ID-БАЗЫ"
+
+# Раз в сутки чистим старые сообщения
+[triggers]
+crons = ["0 4 * * *"]
