@@ -286,7 +286,9 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
 
-    if (p === "/webhook" && req.method === "POST") {
+    // Telegram шлёт вебхук на /webhook или на корень /. GET / остаётся для
+    // Mini App / healthcheck и уходит в статику ниже.
+    if ((p === "/webhook" || p === "/") && req.method === "POST") {
       if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.SECRET) {
         return new Response("forbidden", { status: 403 });
       }
